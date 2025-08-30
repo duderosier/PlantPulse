@@ -295,7 +295,7 @@
     <div class="container">
         <div class="header">
             <h1>🏭 PlantPulse</h1>
-            <p>Equipment Rounds - QR Code Scanner</p>
+            <p>Operator Rounds - QR Code Scanner</p>
         </div>
 
         <div class="status" id="status">
@@ -322,7 +322,7 @@
         </div>
 
         <div id="inspectionForm" class="inspection-form">
-            <h3>Inspection Details</h3>
+            <h3>Round Details</h3>
             <!-- REMOVED QR Code Data field -->
             <div class="form-group">
                 <label>Location Description:</label>
@@ -351,9 +351,9 @@
         </div>
 
         <div class="log-section">
-            <h3>Inspection Log</h3>
+            <h3>Rounds Log</h3>
             <div id="logContainer">
-                <p>No inspections recorded yet.</p>
+                <p>No rounds recorded yet.</p>
             </div>
             <div class="export-controls">
                 <button id="exportBtn" class="btn-primary">Export Log</button>
@@ -575,12 +575,12 @@
                 }
 
                 if (!status) {
-                    alert('Please select inspection status (SAT/UNSAT)');
+                    alert('Please select rounds status (SAT/UNSAT)');
                     return;
                 }
 
                 if (status === 'UNSAT' && !notes) {
-                    alert('Notes are required for UNSAT inspections');
+                    alert('Notes are required for UNSAT rounds');
                     return;
                 }
 
@@ -597,7 +597,7 @@
                 this.saveLog();
                 this.updateLogDisplay();
                 this.cancelInspection();
-                this.updateStatus(`✅ Inspection recorded for ${locationCode}`, 'success');
+                this.updateStatus(`✅ Round recorded for ${locationCode}`, 'success');
             }
 
             cancelInspection() {
@@ -615,7 +615,7 @@
 
             updateLogDisplay() {
                 if (this.inspectionLog.length === 0) {
-                    this.logContainer.innerHTML = '<p>No inspections recorded yet.</p>';
+                    this.logContainer.innerHTML = '<p>No rounds recorded yet.</p>';
                     return;
                 }
 
@@ -642,7 +642,7 @@
             }
 
             clearLog() {
-                if (confirm('Are you sure you want to clear all inspection logs? This cannot be undone.')) {
+                if (confirm('Are you sure you want to clear all rounds logs? This cannot be undone.')) {
                     this.inspectionLog = [];
                     this.saveLog();
                     this.updateLogDisplay();
@@ -652,11 +652,11 @@
 
             exportLog() {
                 if (this.inspectionLog.length === 0) {
-                    alert('No inspections to export');
+                    alert('No rounds to export');
                     return;
                 }
 
-                let logText = 'OPERATOR ROUND LOG\n';
+                let logText = 'OPERATOR ROUNDS LOG\n';
                 logText += '=========================\n\n';
 
                 this.inspectionLog.forEach((entry) => {
@@ -683,11 +683,11 @@
 
             downloadLog() {
                 if (this.inspectionLog.length === 0) {
-                    alert('No inspections to download');
+                    alert('No rounds to download');
                     return;
                 }
 
-                let logText = 'OPERATOR ROUND LOG\n';
+                let logText = 'OPERATOR ROUNDS LOG\n';
                 logText += '=========================\n\n';
 
                 this.inspectionLog.forEach((entry) => {
@@ -707,7 +707,7 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `operator_round_log_${new Date().toISOString().split('T')[0]}.txt`;
+                a.download = `operator_rounds_log_${new Date().toISOString().split('T')[0]}.txt`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
