@@ -324,10 +324,6 @@
         <div id="inspectionForm" class="inspection-form">
             <h3>Inspection Details</h3>
             <div class="form-group">
-                <label>QR Code Data:</label>
-                <input type="text" id="qrData" readonly>
-            </div>
-            <div class="form-group">
                 <label>Location Description:</label>
                 <input type="text" id="locationCode" required>
             </div>
@@ -391,7 +387,7 @@
                 this.qrDisplay = document.getElementById('qrDisplay');
                 this.lastQR = document.getElementById('lastQR');
                 this.inspectionForm = document.getElementById('inspectionForm');
-                this.qrData = document.getElementById('qrData');
+                //this.qrData = document.getElementById('qrData');
                 this.locationCode = document.getElementById('locationCode');
                 this.inspectionStatus = document.getElementById('inspectionStatus');
                 this.reading = document.getElementById('reading');
@@ -559,7 +555,7 @@
             }
 
             showInspectionForm(qrData) {
-                this.qrData.value = qrData;
+                //this.qrData.value = qrData;
                 this.locationCode.value = qrData; // Auto-fill with QR data
                 this.inspectionStatus.value = '';
                 this.reading.value = '';
@@ -589,7 +585,7 @@
             }
 
             submitInspection() {
-                const qrData = this.qrData.value;
+                //const qrData = this.qrData.value;
                 const locationCode = this.locationCode.value.trim();
                 const status = this.inspectionStatus.value;
                 const reading = this.reading.value.trim();
@@ -683,7 +679,7 @@
                     return;
                 }
 
-                let logText = 'COAL PLANT INSPECTION LOG\n';
+                let logText = 'OPERATOR ROUNDS LOG\n';
                 logText += '=========================\n\n';
 
                 this.inspectionLog.forEach((entry) => {
@@ -714,7 +710,7 @@
                     return;
                 }
 
-                let logText = 'COAL PLANT INSPECTION LOG\n';
+                let logText = 'OPERATOR ROUNDS LOG\n';
                 logText += '=========================\n\n';
 
                 this.inspectionLog.forEach((entry) => {
@@ -734,7 +730,7 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `plant_inspection_log_${new Date().toISOString().split('T')[0]}.txt`;
+                a.download = `operator_rounds_log_${new Date().toISOString().split('T')[0]}.txt`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
