@@ -366,6 +366,11 @@
     </div>
 
     <script>
+        if (window.jsQR) {
+  document.body.style.border = "5px solid green"; // jsQR loaded!
+} else {
+  document.body.style.border = "5px solid red"; // jsQR missing!
+        }
         class QRInspectionApp {
             constructor() {
                 this.isScanning = false;
