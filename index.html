@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plant Inspection Scanner</title>
+    <title>PlantPulse</title>
     <script src="jsQR.js"></script>
     <style>
         * {
@@ -294,19 +294,19 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🏭 Plant Inspection Scanner</h1>
-            <p>Coal Plant Equipment Rounds - QR Code Scanner</p>
+            <h1>🏭 PlantPulse</h1>
+            <p>Equipment Rounds - QR Code Scanner</p>
         </div>
 
         <div class="status" id="status">
-            Ready to scan QR codes - Center QR code in the square box
+            Center QR code in square box
         </div>
 
         <div class="scanner-container">
             <video id="video" autoplay playsinline></video>
             <canvas id="canvas"></canvas>
             <div class="scanner-placeholder" id="placeholder">
-                <p>Click "Start Camera" to begin <br>scanning QR codes</p>
+                <p>Click "Start Camera" to begin</p>
             </div>
             <div class="scanner-overlay"></div>
         </div>
