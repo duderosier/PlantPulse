@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plant Inspection Scanner</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+    <script src="jsQR.js"></script>
     <style>
         * {
             margin: 0;
@@ -493,15 +493,15 @@
                     }
                     
                     // Try scanning just the center region for better performance
-                    //const centerX = Math.floor(this.canvas.width * 0.15);
-                    //const centerY = Math.floor(this.canvas.height * 0.15);
-                    //const centerWidth = Math.floor(this.canvas.width * 0.7);
-                    //const centerHeight = Math.floor(this.canvas.height * 0.7);
+                    const centerX = Math.floor(this.canvas.width * 0.15);
+                    const centerY = Math.floor(this.canvas.height * 0.15);
+                    const centerWidth = Math.floor(this.canvas.width * 0.7);
+                    const centerHeight = Math.floor(this.canvas.height * 0.7);
                     
-                    //const centerImageData = this.context.getImageData(centerX, centerY, centerWidth, centerHeight);
-                    //code = jsQR(centerImageData.data, centerImageData.width, centerImageData.height, {
-                    //    inversionAttempts: "attemptBoth"
-                    //});
+                    const centerImageData = this.context.getImageData(centerX, centerY, centerWidth, centerHeight);
+                    code = jsQR(centerImageData.data, centerImageData.width, centerImageData.height, {
+                        inversionAttempts: "attemptBoth"
+                    });
                     
                     if (code && code.data && code.data.trim()) {
                         console.log('QR Code detected in center:', code.data);
