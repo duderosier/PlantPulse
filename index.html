@@ -310,8 +310,12 @@
         <div id="inspectionForm" class="inspection-form">
             <h3>Inspection Details</h3>
             <div class="form-group">
-                <label>Location Code:</label>
-                <input type="text" id="locationCode" readonly>
+                <label>Barcode Data:</label>
+                <input type="text" id="barcodeData" readonly>
+            </div>
+            <div class="form-group">
+                <label>Location Description:</label>
+                <input type="text" id="locationCode" placeholder="e.g., 8th Floor Door #1" required>
             </div>
             <div class="form-group">
                 <label>Status:</label>
@@ -415,8 +419,8 @@
                             type: "LiveStream",
                             target: this.scanner,
                             constraints: {
-                                width: { min: 300 },
-                                height: { min: 200 },
+                                width: { min: 640, ideal: 1280 },
+                                height: { min: 480, ideal: 720 },
                                 facingMode: "environment"
                             }
                         },
@@ -431,13 +435,21 @@
                                 "upc_reader",
                                 "upc_e_reader",
                                 "i2of5_reader"
-                            ]
+                            ],
+                            debug: {
+                                drawBoundingBox: true,
+                                showFrequency: false,
+                                drawScanline: true,
+                                showPattern: false
+                            }
                         },
                         locate: true,
                         locator: {
                             halfSample: true,
                             patchSize: "medium"
-                        }
+                        },
+                        numOfWorkers: 2,
+                        frequency: 10
                     }, (err) => {
                         if (err) {
                             console.error(err);
@@ -490,6 +502,11 @@
                 // Prevent duplicate rapid scans
                 if (this.currentBarcode === barcode) return;
                 
+                // Add vibration feedback if available
+                if (navigator.vibrate) {
+                    navigator.vibrate(200);
+                }
+                
                 this.currentBarcode = barcode;
                 this.lastBarcode.textContent = barcode;
                 this.barcodeDisplay.classList.remove('hidden');
@@ -500,7 +517,7 @@
                 }, 300);
 
                 this.showInspectionForm(barcode);
-                this.updateStatus(`Barcode detected: ${barcode}`);
+                this.updateStatus(`✅ Barcode scanned: ${barcode}`, 'success');
                 
                 // Auto-stop scanning to prevent conflicts
                 this.stopScanning();
@@ -531,10 +548,16 @@
             }
 
             submitInspection() {
-                const locationCode = this.locationCode.value;
+                const barcodeData = this.barcodeData.value;
+                const locationCode = this.locationCode.value.trim();
                 const status = this.inspectionStatus.value;
                 const reading = this.reading.value.trim();
                 const notes = this.notes.value.trim();
+
+                if (!locationCode) {
+                    alert('Please enter a location description');
+                    return;
+                }
 
                 if (!status) {
                     alert('Please select inspection status (SAT/UNSAT)');
@@ -547,6 +570,7 @@
                 }
 
                 const inspection = {
+                    barcodeData,
                     locationCode,
                     status,
                     reading: status === 'SAT' ? reading : '',
@@ -559,7 +583,7 @@
                 this.saveLog();
                 this.updateLogDisplay();
                 this.cancelInspection();
-                this.updateStatus(`Inspection recorded for location ${locationCode}`);
+                this.updateStatus(`Inspection recorded for ${locationCode}`);
             }
 
             cancelInspection() {
