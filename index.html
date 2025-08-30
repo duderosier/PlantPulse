@@ -50,8 +50,8 @@
                 <label>Status:</label>
                 <select id="inspectionStatus">
                     <option value="">Select Status</option>
-                    <option value="SAT">SAT (Satisfactory)</option>
-                    <option value="UNSAT">UNSAT (Unsatisfactory)</option>
+                    <option value="SAT">SAT</option>
+                    <option value="UNSAT">UNSAT</option>
                 </select>
             </div>
             <div class="form-group" id="readingGroup">
@@ -374,7 +374,7 @@
                     return;
                 }
 
-                let logText = 'COAL PLANT INSPECTION LOG\n';
+                let logText = 'OPERATOR ROUND LOG\n';
                 logText += '=========================\n\n';
 
                 this.inspectionLog.forEach((entry) => {
@@ -405,7 +405,7 @@
                     return;
                 }
 
-                let logText = 'COAL PLANT INSPECTION LOG\n';
+                let logText = 'OPERATOR ROUND LOG\n';
                 logText += '=========================\n\n';
 
                 this.inspectionLog.forEach((entry) => {
@@ -425,7 +425,7 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `plant_inspection_log_${new Date().toISOString().split('T')[0]}.txt`;
+                a.download = `operator_round_log_${new Date().toISOString().split('T')[0]}.txt`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
