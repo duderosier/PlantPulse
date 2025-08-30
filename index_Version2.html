@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlantPulse</title>
+    <script src="jsQR.js"></script>
+    <style>
+        /* ... (CSS unchanged) ... */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏭 PlantPulse</h1>
+            <p>Equipment Rounds - QR Code Scanner</p>
+        </div>
+
+        <div class="status" id="status">
+            Center QR code in square box
+        </div>
+
+        <div class="scanner-container">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
+            <div class="scanner-placeholder" id="placeholder">
+                <p>Click "Start Camera" to begin</p>
+            </div>
+            <div class="scanner-overlay"></div>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" class="btn-primary">Start Camera</button>
+            <button id="stopBtn" class="btn-secondary" disabled>Stop Camera</button>
+            <button id="clearLogBtn" class="btn-danger">Clear Log</button>
+        </div>
+
+        <div id="qrDisplay" class="qr-display hidden">
+            <div>Last Scanned: <span id="lastQR">None</span></div>
+        </div>
+
+        <div id="inspectionForm" class="inspection-form">
+            <h3>Inspection Details</h3>
+            <!-- REMOVED QR Code Data field -->
+            <div class="form-group">
+                <label>Location Description:</label>
+                <input type="text" id="locationCode" required>
+            </div>
+            <div class="form-group">
+                <label>Status:</label>
+                <select id="inspectionStatus">
+                    <option value="">Select Status</option>
+                    <option value="SAT">SAT (Satisfactory)</option>
+                    <option value="UNSAT">UNSAT (Unsatisfactory)</option>
+                </select>
+            </div>
+            <div class="form-group" id="readingGroup">
+                <label>Reading (Optional):</label>
+                <input type="text" id="reading" placeholder="Enter equipment reading">
+            </div>
+            <div class="form-group hidden" id="notesGroup">
+                <label>Notes (Required for UNSAT):</label>
+                <textarea id="notes" placeholder="Describe the issue or condition"></textarea>
+            </div>
+            <div class="controls">
+                <button id="submitBtn" class="btn-success">Submit Inspection</button>
+                <button id="cancelBtn" class="btn-secondary">Cancel</button>
+            </div>
+        </div>
+
+        <div class="log-section">
+            <h3>Inspection Log</h3>
+            <div id="logContainer">
+                <p>No inspections recorded yet.</p>
+            </div>
+            <div class="export-controls">
+                <button id="exportBtn" class="btn-primary">Export Log</button>
+                <button id="downloadBtn" class="btn-success">Download TXT</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class QRInspectionApp {
+            constructor() {
+                this.isScanning = false;
+                this.currentQR = null;
+                this.inspectionLog = this.loadLog();
+                this.video = document.getElementById('video');
+                this.canvas = document.getElementById('canvas');
+                this.context = this.canvas.getContext('2d');
+                this.animationFrame = null;
+                this.stream = null;
+                
+                this.initializeElements();
+                this.bindEvents();
+                this.updateLogDisplay();
+            }
+
+            initializeElements() {
+                this.startBtn = document.getElementById('startBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                this.clearLogBtn = document.getElementById('clearLogBtn');
+                this.status = document.getElementById('status');
+                this.placeholder = document.getElementById('placeholder');
+                this.qrDisplay = document.getElementById('qrDisplay');
+                this.lastQR = document.getElementById('lastQR');
+                this.inspectionForm = document.getElementById('inspectionForm');
+                // QR Code Data field removed
+                this.locationCode = document.getElementById('locationCode');
+                this.inspectionStatus = document.getElementById('inspectionStatus');
+                this.reading = document.getElementById('reading');
+                this.notes = document.getElementById('notes');
+                this.readingGroup = document.getElementById('readingGroup');
+                this.notesGroup = document.getElementById('notesGroup');
+                this.submitBtn = document.getElementById('submitBtn');
+                this.cancelBtn = document.getElementById('cancelBtn');
+                this.exportBtn = document.getElementById('exportBtn');
+                this.downloadBtn = document.getElementById('downloadBtn');
+                this.logContainer = document.getElementById('logContainer');
+            }
+
+            bindEvents() {
+                this.startBtn.addEventListener('click', () => this.startScanning());
+                this.stopBtn.addEventListener('click', () => this.stopScanning());
+                this.clearLogBtn.addEventListener('click', () => this.clearLog());
+                this.inspectionStatus.addEventListener('change', () => this.handleStatusChange());
+                this.submitBtn.addEventListener('click', () => this.submitInspection());
+                this.cancelBtn.addEventListener('click', () => this.cancelInspection());
+                this.exportBtn.addEventListener('click', () => this.exportLog());
+                this.downloadBtn.addEventListener('click', () => this.downloadLog());
+            }
+
+            async startScanning() {
+                try {
+                    this.updateStatus('Requesting camera permissions...', 'info');
+                    
+                    this.stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        }
+                    });
+
+                    this.video.srcObject = this.stream;
+                    this.video.setAttribute('playsinline', true);
+                    this.video.play();
+                    
+                    this.placeholder.style.display = 'none';
+                    this.video.style.display = 'block';
+                    
+                    this.isScanning = true;
+                    this.startBtn.disabled = true;
+                    this.stopBtn.disabled = false;
+                    
+                    this.updateStatus('Camera active - Point at QR code to scan', 'success');
+                    
+                    this.video.addEventListener('loadedmetadata', () => {
+                        this.canvas.width = this.video.videoWidth;
+                        this.canvas.height = this.video.videoHeight;
+                        this.scanQRCode();
+                    });
+
+                } catch (error) {
+                    console.error('Camera error:', error);
+                    let errorMessage = 'Camera access failed. ';
+                    
+                    if (error.name === 'NotAllowedError') {
+                        errorMessage += 'Please allow camera permissions and try again.';
+                    } else if (error.name === 'NotFoundError') {
+                        errorMessage += 'No camera found on this device.';
+                    } else if (error.name === 'NotSupportedError') {
+                        errorMessage += 'Camera not supported in this browser.';
+                    } else {
+                        errorMessage += error.message;
+                    }
+                    
+                    this.updateStatus(errorMessage, 'error');
+                }
+            }
+
+            scanQRCode() {
+                if (!this.isScanning) return;
+                
+                if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
+                    this.canvas.width = this.video.videoWidth;
+                    this.canvas.height = this.video.videoHeight;
+                    this.context.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+                    
+                    const imageData = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height);
+                    
+                    let code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "attemptBoth"
+                    });
+                    
+                    if (code && code.data && code.data.trim()) {
+                        console.log('QR Code detected:', code.data);
+                        this.handleQRDetected(code.data.trim());
+                        return;
+                    }
+                    
+                    // Try scanning just the center region for better performance
+                    const centerX = Math.floor(this.canvas.width * 0.15);
+                    const centerY = Math.floor(this.canvas.height * 0.15);
+                    const centerWidth = Math.floor(this.canvas.width * 0.7);
+                    const centerHeight = Math.floor(this.canvas.height * 0.7);
+                    
+                    const centerImageData = this.context.getImageData(centerX, centerY, centerWidth, centerHeight);
+                    code = jsQR(centerImageData.data, centerImageData.width, centerImageData.height, {
+                        inversionAttempts: "attemptBoth"
+                    });
+                    
+                    if (code && code.data && code.data.trim()) {
+                        console.log('QR Code detected in center:', code.data);
+                        this.handleQRDetected(code.data.trim());
+                        return;
+                    }
+                }
+                
+                this.animationFrame = requestAnimationFrame(() => this.scanQRCode());
+            }
+
+            handleQRDetected(qrData) {
+                if (this.currentQR === qrData) return;
+                if (navigator.vibrate) navigator.vibrate(200);
+                this.currentQR = qrData;
+                this.lastQR.textContent = qrData;
+                this.qrDisplay.classList.remove('hidden');
+                this.qrDisplay.classList.add('flash');
+                setTimeout(() => {
+                    this.qrDisplay.classList.remove('flash');
+                }, 500);
+                this.showInspectionForm(qrData);
+                this.updateStatus(`✅ QR Code detected: ${qrData}`, 'success');
+                this.stopScanning();
+            }
+
+            stopScanning() {
+                this.isScanning = false;
+                if (this.animationFrame) {
+                    cancelAnimationFrame(this.animationFrame);
+                    this.animationFrame = null;
+                }
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.stream = null;
+                }
+                this.video.srcObject = null;
+                this.video.style.display = 'none';
+                this.placeholder.style.display = 'flex';
+                this.startBtn.disabled = false;
+                this.stopBtn.disabled = true;
+                this.updateStatus('Camera stopped');
+            }
+
+            showInspectionForm(qrData) {
+                this.locationCode.value = qrData; // Auto-fill with QR data
+                this.inspectionStatus.value = '';
+                this.reading.value = '';
+                this.notes.value = '';
+                this.readingGroup.classList.remove('hidden');
+                this.notesGroup.classList.add('hidden');
+                this.inspectionForm.classList.add('active');
+                setTimeout(() => {
+                    this.inspectionStatus.focus();
+                }, 100);
+            }
+
+            handleStatusChange() {
+                const status = this.inspectionStatus.value;
+                if (status === 'SAT') {
+                    this.readingGroup.classList.remove('hidden');
+                    this.notesGroup.classList.add('hidden');
+                } else if (status === 'UNSAT') {
+                    this.readingGroup.classList.add('hidden');
+                    this.notesGroup.classList.remove('hidden');
+                } else {
+                    this.readingGroup.classList.remove('hidden');
+                    this.notesGroup.classList.add('hidden');
+                }
+            }
+
+            submitInspection() {
+                const locationCode = this.locationCode.value.trim();
+                const status = this.inspectionStatus.value;
+                const reading = this.reading.value.trim();
+                const notes = this.notes.value.trim();
+
+                if (!locationCode) {
+                    alert('Please enter a location description');
+                    return;
+                }
+
+                if (!status) {
+                    alert('Please select inspection status (SAT/UNSAT)');
+                    return;
+                }
+
+                if (status === 'UNSAT' && !notes) {
+                    alert('Notes are required for UNSAT inspections');
+                    return;
+                }
+
+                const inspection = {
+                    locationCode,
+                    status,
+                    reading: status === 'SAT' ? reading : '',
+                    notes: status === 'UNSAT' ? notes : '',
+                    timestamp: new Date().toISOString(),
+                    dateTime: new Date().toLocaleString()
+                };
+
+                this.inspectionLog.push(inspection);
+                this.saveLog();
+                this.updateLogDisplay();
+                this.cancelInspection();
+                this.updateStatus(`✅ Inspection recorded for ${locationCode}`, 'success');
+            }
+
+            cancelInspection() {
+                this.inspectionForm.classList.remove('active');
+                this.currentQR = null;
+            }
+
+            loadLog() {
+                return window.inspectionLog || [];
+            }
+
+            saveLog() {
+                window.inspectionLog = this.inspectionLog;
+            }
+
+            updateLogDisplay() {
+                if (this.inspectionLog.length === 0) {
+                    this.logContainer.innerHTML = '<p>No inspections recorded yet.</p>';
+                    return;
+                }
+
+                let html = '';
+                const sortedLog = [...this.inspectionLog].reverse();
+
+                sortedLog.forEach((entry) => {
+                    const statusClass = entry.status.toLowerCase();
+                    html += `
+                        <div class="log-entry ${statusClass}">
+                            <div class="log-entry-header">
+                                ${entry.locationCode} - ${entry.status}
+                            </div>
+                            <div class="log-entry-details">
+                                <div>Date/Time: ${entry.dateTime}</div>
+                                ${entry.reading ? `<div>Reading: ${entry.reading}</div>` : ''}
+                                ${entry.notes ? `<div>Notes: ${entry.notes}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                this.logContainer.innerHTML = html;
+            }
+
+            clearLog() {
+                if (confirm('Are you sure you want to clear all inspection logs? This cannot be undone.')) {
+                    this.inspectionLog = [];
+                    this.saveLog();
+                    this.updateLogDisplay();
+                    this.updateStatus('Inspection log cleared');
+                }
+            }
+
+            exportLog() {
+                if (this.inspectionLog.length === 0) {
+                    alert('No inspections to export');
+                    return;
+                }
+
+                let logText = 'COAL PLANT INSPECTION LOG\n';
+                logText += '=========================\n\n';
+
+                this.inspectionLog.forEach((entry) => {
+                    logText += `Location: ${entry.locationCode}\n`;
+                    logText += `Status: ${entry.status}\n`;
+                    logText += `Date/Time: ${entry.dateTime}\n`;
+                    if (entry.reading) {
+                        logText += `Reading: ${entry.reading}\n`;
+                    }
+                    if (entry.notes) {
+                        logText += `Notes: ${entry.notes}\n`;
+                    }
+                    logText += '\n---\n\n';
+                });
+
+                navigator.clipboard.writeText(logText).then(() => {
+                    this.updateStatus('Log copied to clipboard!');
+                }).catch(() => {
+                    this.updateStatus('Export complete (clipboard not available)');
+                });
+
+                alert('Log exported to clipboard!');
+            }
+
+            downloadLog() {
+                if (this.inspectionLog.length === 0) {
+                    alert('No inspections to download');
+                    return;
+                }
+
+                let logText = 'COAL PLANT INSPECTION LOG\n';
+                logText += '=========================\n\n';
+
+                this.inspectionLog.forEach((entry) => {
+                    logText += `Location: ${entry.locationCode}\n`;
+                    logText += `Status: ${entry.status}\n`;
+                    logText += `Date/Time: ${entry.dateTime}\n`;
+                    if (entry.reading) {
+                        logText += `Reading: ${entry.reading}\n`;
+                    }
+                    if (entry.notes) {
+                        logText += `Notes: ${entry.notes}\n`;
+                    }
+                    logText += '\n---\n\n';
+                });
+
+                const blob = new Blob([logText], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `plant_inspection_log_${new Date().toISOString().split('T')[0]}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                this.updateStatus('Log file downloaded!');
+            }
+
+            updateStatus(message, type = 'info') {
+                this.status.textContent = message;
+                if (type === 'error') {
+                    this.status.style.background = '#e74c3c';
+                } else if (type === 'success') {
+                    this.status.style.background = '#27ae60';
+                } else {
+                    this.status.style.background = '#34495e';
+                }
+            }
+        }
+
+        let app;
+        document.addEventListener('DOMContentLoaded', () => {
+            app = new QRInspectionApp();
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && app && app.isScanning) {
+                app.stopScanning();
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (app && app.isScanning) {
+                app.stopScanning();
+            }
+        });
+    </script>
+</body>
+</html>
