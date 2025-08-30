@@ -296,7 +296,7 @@
         </div>
 
         <div class="status" id="status">
-            Ready to scan QR codes
+            Ready to scan QR codes - Hold phone 6-12 inches from code
         </div>
 
         <div class="scanner-container">
@@ -471,10 +471,13 @@
                     this.context.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
                     
                     const imageData = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height);
-                    const code = jsQR(imageData.data, imageData.width, imageData.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "dontInvert"
+                    });
                     
-                    if (code && code.data) {
-                        this.handleQRDetected(code.data);
+                    if (code && code.data && code.data.trim()) {
+                        console.log('QR Code detected:', code.data);
+                        this.handleQRDetected(code.data.trim());
                         return; // Stop scanning after detection
                     }
                 }
@@ -751,4 +754,3 @@
     </script>
 </body>
 </html>
-                
