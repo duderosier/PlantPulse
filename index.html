@@ -1101,17 +1101,18 @@
                 doc.text(lines, 10, 20);
 
                 // Prompt for email (optional)
-                let email = prompt("Enter recipient email to send PDF (leave blank to skip):");
-                if (email && email.trim()) {
+                //let email = prompt("Enter recipient email to send PDF (leave blank to skip):");
+                //if (email && email.trim()) {
                     // Attach PDF to mailto link
-                    doc.save(`Operator_Rounds_Log_${titleInfo.fileSuffix}.pdf`); // Download for user
-                    setTimeout(() => {
+                    //doc.save(`Operator_Rounds_Log_${titleInfo.fileSuffix}.pdf`); // Download for user
+                    //setTimeout(() => {
+                        doc.save(`Operator_Rounds_Log_${titleInfo.fileSuffix}.pdf`);
                         let mailto = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent('Operator Rounds Log ' + titleInfo.subjectSuffix)}&body=${encodeURIComponent('Please find attached the operator rounds log.')}`;
                         window.location.href = mailto;
-                    }, 500);
-                } else {
-                    doc.save(`Operator_Rounds_Log_${titleInfo.fileSuffix}.pdf`);
-                }
+                    //}, 500);
+                //} else {
+                    //doc.save(`Operator_Rounds_Log_${titleInfo.fileSuffix}.pdf`);
+                //}
             }
 
             downloadLog() {
