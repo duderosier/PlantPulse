@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlantPulse</title>
+    <script src="jsQR.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 100vw;
+            margin: 0 auto;
+            padding: 10px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            margin-bottom: 20px;
+            border-radius: 10px;
+        }
+
+        .header h1 {
+            font-size: 1.5em;
+            margin-bottom: 5px;
+        }
+
+        .status {
+            background: #34495e;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .scanner-container {
+            position: relative;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #2c3e50;
+            width: 100%;
+            height: 350px;
+            max-width: 350px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+
+        #canvas {
+            display: none;
+        }
+
+        .scanner-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            height: 60%;
+            border: 2px solid #e74c3c;
+            border-radius: 10px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .scanner-overlay::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60%;
+            height: 2px;
+            background: #e74c3c;
+            animation: scan 2s linear infinite;
+        }
+
+        @keyframes scan {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        .scanner-message {
+            position: absolute;
+            top: 18%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            color: #bdc3c7;
+            text-align: center;
+            font-size: 1.1em;
+            z-index: 20;
+            background: rgba(44,62,80,0.7);
+            padding: 6px 10px;
+            border-radius: 6px;
+            pointer-events: none;
+        }
+
+        .scanner-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #bdc3c7;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 120px;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #2980b9;
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #229954;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #c0392b;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #7f8c8d;
+        }
+
+        .inspection-form {
+            background: #34495e;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .inspection-form.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #7f8c8d;
+            border-radius: 5px;
+            font-size: 16px;
+            background: #2c3e50;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+
+        input::placeholder, textarea::placeholder {
+            color: #bdc3c7;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+            color: #fff;
+            background: #2c3e50;
+        }
+
+        .qr-display {
+            background: #2c3e50;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            border: 2px solid #3498db;
+        }
+
+        .log-section {
+            background: #34495e;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .log-shift-label {
+            font-size: 1.05em;
+            font-weight: bold;
+            color: #3498db;
+            margin-top: 8px;
+            margin-bottom: 12px;
+            text-align: left;
+        }
+
+        .log-entry {
+            background: #2c3e50;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+
+        .log-entry.sat {
+            border-left-color: #27ae60;
+        }
+
+        .log-entry.unsat {
+            border-left-color: #e74c3c;
+        }
+
+        .log-entry-header {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .log-entry-details {
+            font-size: 14px;
+            color: #bdc3c7;
+        }
+
+        .export-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .flash {
+            animation: flash 0.3s ease-in-out;
+        }
+
+        @keyframes flash {
+            0%, 100% { background-color: inherit; }
+            50% { background-color: #27ae60; }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Manual Entry Dialog Styles */
+        .manual-entry-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(44, 62, 80, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .manual-entry-content {
+            background: #34495e;
+            padding: 30px 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px #2228;
+            max-width: 90vw;
+            width: 350px;
+            text-align: center;
+        }
+
+        .manual-entry-content h2 {
+            color: #3498db;
+            margin-bottom: 18px;
+            font-size: 1.25em;
+        }
+
+        .manual-entry-content label {
+            font-size: 1em;
+            margin-bottom: 6px;
+            color: #fff;
+            font-weight: bold;
+            display: block;
+        }
+
+        .manual-entry-content input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 18px;
+            border-radius: 6px;
+            border: 1px solid #7f8c8d;
+            font-size: 16px;
+            background: #2c3e50;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+
+        .manual-entry-content .controls {
+            gap: 10px;
+            margin-bottom: 0;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 5px;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            button {
+                min-width: unset;
+            }
+            .manual-entry-content {
+                width: 95vw;
+            }
+            .scanner-message {
+                font-size: 1em;
+                top: 12%;
+                padding: 4px 6px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏭 PlantPulse</h1>
+            <p>Operator Rounds - QR Code Scanner</p>
+        </div>
+
+        <div class="status" id="status">
+            Center QR code in square box
+        </div>
+
+        <div class="scanner-container">
+            <div class="scanner-message" id="scannerMessage">
+                Click "Start Camera" to begin
+            </div>
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
+            <div class="scanner-placeholder" id="placeholder"></div>
+            <div class="scanner-overlay"></div>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" class="btn-primary">Start Camera</button>
+            <button id="stopBtn" class="btn-secondary" disabled>Stop Camera</button>
+            <button id="manualEntryBtn" class="btn-primary">Manual Entry</button>
+            <button id="clearLogBtn" class="btn-danger">Clear Log</button>
+        </div>
+
+        <div id="qrDisplay" class="qr-display hidden">
+            <div>Last Scanned: <span id="lastQR">None</span></div>
+        </div>
+
+        <div id="inspectionForm" class="inspection-form">
+            <h3>Round Details</h3>
+            <div class="form-group">
+                <label>Location Description:</label>
+                <input type="text" id="locationCode" required>
+            </div>
+            <div class="form-group">
+                <label>Status:</label>
+                <select id="inspectionStatus">
+                    <option value="">Select Status</option>
+                    <option value="SAT">SAT</option>
+                    <option value="UNSAT">UNSAT</option>
+                </select>
+            </div>
+            <div class="form-group" id="readingGroup">
+                <label>Reading (Optional):</label>
+                <input type="text" id="reading" placeholder="Enter equipment reading">
+            </div>
+            <div class="form-group hidden" id="notesGroup">
+                <label>Notes (Required for UNSAT):</label>
+                <textarea id="notes" placeholder="Describe the issue or condition"></textarea>
+            </div>
+            <div class="controls">
+                <button id="submitBtn" class="btn-success">Submit</button>
+                <button id="cancelBtn" class="btn-secondary">Cancel</button>
+            </div>
+        </div>
+
+        <div class="log-section">
+            <h3>Rounds Log</h3>
+            <div id="logShiftLabel" class="log-shift-label"></div>
+            <div id="logContainer">
+                <p>No rounds recorded yet.</p>
+            </div>
+            <div class="export-controls">
+                <button id="exportBtn" class="btn-primary">Export PDF & Email</button>
+                <button id="downloadBtn" class="btn-success">Download TXT</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Entry Modal (hidden by default) -->
+    <div id="manualEntryModal" class="manual-entry-modal hidden">
+        <div class="manual-entry-content">
+            <h2>Manual Location Entry</h2>
+            <label for="manualLocationInput">Location Description:</label>
+            <input type="text" id="manualLocationInput" placeholder="Type location code/description" autocomplete="off">
+            <div class="controls">
+                <button id="manualEntrySubmitBtn" class="btn-success">Submit</button>
+                <button id="manualEntryCancelBtn" class="btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class QRInspectionApp {
+            constructor() {
+                this.isScanning = false;
+                this.currentQR = null;
+                this.inspectionLog = this.loadLog();
+                this.video = document.getElementById('video');
+                this.canvas = document.getElementById('canvas');
+                this.context = this.canvas.getContext('2d');
+                this.animationFrame = null;
+                this.stream = null;
+                
+                this.initializeElements();
+                this.bindEvents();
+                this.updateLogDisplay();
+            }
+
+            initializeElements() {
+                this.startBtn = document.getElementById('startBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                this.manualEntryBtn = document.getElementById('manualEntryBtn');
+                this.clearLogBtn = document.getElementById('clearLogBtn');
+                this.status = document.getElementById('status');
+                this.placeholder = document.getElementById('placeholder');
+                this.qrDisplay = document.getElementById('qrDisplay');
+                this.lastQR = document.getElementById('lastQR');
+                this.inspectionForm = document.getElementById('inspectionForm');
+                this.locationCode = document.getElementById('locationCode');
+                this.inspectionStatus = document.getElementById('inspectionStatus');
+                this.reading = document.getElementById('reading');
+                this.notes = document.getElementById('notes');
+                this.readingGroup = document.getElementById('readingGroup');
+                this.notesGroup = document.getElementById('notesGroup');
+                this.submitBtn = document.getElementById('submitBtn');
+                this.cancelBtn = document.getElementById('cancelBtn');
+                this.exportBtn = document.getElementById('exportBtn');
+                this.downloadBtn = document.getElementById('downloadBtn');
+                this.logContainer = document.getElementById('logContainer');
+                this.logShiftLabel = document.getElementById('logShiftLabel');
+                this.manualEntryModal = document.getElementById('manualEntryModal');
+                this.manualLocationInput = document.getElementById('manualLocationInput');
+                this.manualEntrySubmitBtn = document.getElementById('manualEntrySubmitBtn');
+                this.manualEntryCancelBtn = document.getElementById('manualEntryCancelBtn');
+            }
+
+            bindEvents() {
+                this.startBtn.addEventListener('click', () => this.startScanning());
+                this.stopBtn.addEventListener('click', () => this.stopScanning());
+                this.manualEntryBtn.addEventListener('click', () => this.openManualEntryModal());
+                this.manualEntrySubmitBtn.addEventListener('click', () => this.handleManualEntrySubmit());
+                this.manualEntryCancelBtn.addEventListener('click', () => this.closeManualEntryModal());
+                this.clearLogBtn.addEventListener('click', () => this.clearLog());
+                this.inspectionStatus.addEventListener('change', () => this.handleStatusChange());
+                this.submitBtn.addEventListener('click', () => this.submitInspection());
+                this.cancelBtn.addEventListener('click', () => this.cancelInspection());
+                this.exportBtn.addEventListener('click', () => this.exportLogAsPDFAndEmail());
+                this.downloadBtn.addEventListener('click', () => this.downloadLog());
+                this.manualLocationInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.handleManualEntrySubmit();
+                    }
+                });
+                this.manualEntryModal.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        this.closeManualEntryModal();
+                    }
+                });
+            }
+
+            // Utility to get current shift info based on local time
+            getShiftInfo(dateObj = null) {
+                // Use provided dateObj or current time
+                const now = dateObj ? new Date(dateObj) : new Date();
+                const hours = now.getHours();
+                let shift = '';
+                // Day Shift: 06:00-17:59, Night Shift: 18:00-05:59
+                if (hours >= 6 && hours < 18) {
+                    shift = 'Day Shift';
+                } else {
+                    shift = 'Night Shift';
+                }
+                // Format date as YYYY-MM-DD
+                const date = now.toISOString().split('T')[0];
+                // Format time as HH:mm
+                const time = now.toTimeString().slice(0, 5);
+                return {
+                    date,
+                    time,
+                    shift,
+                    subjectSuffix: `${date} ${shift}`,
+                    fileSuffix: `${date}_${shift.replace(' ', '_')}`
+                };
+            }
+
+            async startScanning() {
+                try {
+                    this.updateStatus('Requesting camera permissions...', 'info');
+                    
+                    this.stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        }
+                    });
+
+                    this.video.srcObject = this.stream;
+                    this.video.setAttribute('playsinline', true);
+                    this.video.play();
+                    
+                    this.placeholder.style.display = 'none';
+                    this.video.style.display = 'block';
+                    
+                    this.isScanning = true;
+                    this.startBtn.disabled = true;
+                    this.stopBtn.disabled = false;
+                    this.manualEntryBtn.disabled = true;
+                    
+                    this.updateStatus('Camera active - Point at QR code to scan', 'success');
+                    
+                    this.video.addEventListener('loadedmetadata', () => {
+                        this.canvas.width = this.video.videoWidth;
+                        this.canvas.height = this.video.videoHeight;
+                        this.scanQRCode();
+                    });
+
+                } catch (error) {
+                    console.error('Camera error:', error);
+                    let errorMessage = 'Camera access failed. ';
+                    
+                    if (error.name === 'NotAllowedError') {
+                        errorMessage += 'Please allow camera permissions and try again.';
+                    } else if (error.name === 'NotFoundError') {
+                        errorMessage += 'No camera found on this device.';
+                    } else if (error.name === 'NotSupportedError') {
+                        errorMessage += 'Camera not supported in this browser.';
+                    } else {
+                        errorMessage += error.message;
+                    }
+                    
+                    this.updateStatus(errorMessage, 'error');
+                }
+            }
+
+            scanQRCode() {
+                if (!this.isScanning) return;
+                
+                if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
+                    this.canvas.width = this.video.videoWidth;
+                    this.canvas.height = this.video.videoHeight;
+                    this.context.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+                    
+                    const imageData = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height);
+                    
+                    let code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "attemptBoth"
+                    });
+                    
+                    if (code && code.data && code.data.trim()) {
+                        console.log('QR Code detected:', code.data);
+                        this.handleQRDetected(code.data.trim());
+                        return;
+                    }
+                    
+                    const centerX = Math.floor(this.canvas.width * 0.15);
+                    const centerY = Math.floor(this.canvas.height * 0.15);
+                    const centerWidth = Math.floor(this.canvas.width * 0.7);
+                    const centerHeight = Math.floor(this.canvas.height * 0.7);
+                    
+                    const centerImageData = this.context.getImageData(centerX, centerY, centerWidth, centerHeight);
+                    code = jsQR(centerImageData.data, centerImageData.width, centerImageData.height, {
+                        inversionAttempts: "attemptBoth"
+                    });
+                    
+                    if (code && code.data && code.data.trim()) {
+                        console.log('QR Code detected in center:', code.data);
+                        this.handleQRDetected(code.data.trim());
+                        return;
+                    }
+                }
+                
+                this.animationFrame = requestAnimationFrame(() => this.scanQRCode());
+            }
+
+            handleQRDetected(qrData) {
+                if (this.currentQR === qrData) return;
+                if (navigator.vibrate) navigator.vibrate(200);
+                this.currentQR = qrData;
+                this.lastQR.textContent = qrData;
+                this.qrDisplay.classList.remove('hidden');
+                this.qrDisplay.classList.add('flash');
+                setTimeout(() => {
+                    this.qrDisplay.classList.remove('flash');
+                }, 500);
+                this.showInspectionForm(qrData);
+                this.updateStatus(`✅ QR Code detected: ${qrData}`, 'success');
+                this.stopScanning();
+            }
+
+            stopScanning() {
+                this.isScanning = false;
+                if (this.animationFrame) {
+                    cancelAnimationFrame(this.animationFrame);
+                    this.animationFrame = null;
+                }
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.stream = null;
+                }
+                this.video.srcObject = null;
+                this.video.style.display = 'none';
+                this.placeholder.style.display = 'flex';
+                this.startBtn.disabled = false;
+                this.stopBtn.disabled = true;
+                this.manualEntryBtn.disabled = false;
+                this.updateStatus('Camera stopped');
+            }
+
+            showInspectionForm(qrData) {
+                this.locationCode.value = qrData;
+                this.inspectionStatus.value = '';
+                this.reading.value = '';
+                this.notes.value = '';
+                this.readingGroup.classList.remove('hidden');
+                this.notesGroup.classList.add('hidden');
+                this.inspectionForm.classList.add('active');
+                setTimeout(() => {
+                    this.inspectionStatus.focus();
+                }, 100);
+            }
+
+            handleStatusChange() {
+                const status = this.inspectionStatus.value;
+                if (status === 'SAT') {
+                    this.readingGroup.classList.remove('hidden');
+                    this.notesGroup.classList.add('hidden');
+                } else if (status === 'UNSAT') {
+                    this.readingGroup.classList.remove('hidden');
+                    this.notesGroup.classList.remove('hidden');
+                } else {
+                    this.readingGroup.classList.remove('hidden');
+                    this.notesGroup.classList.add('hidden');
+                }
+            }
+
+            submitInspection() {
+                const locationCode = this.locationCode.value.trim();
+                const status = this.inspectionStatus.value;
+                const reading = this.reading.value.trim();
+                const notes = this.notes.value.trim();
+
+                if (!locationCode) {
+                    alert('Please enter a location description');
+                    return;
+                }
+
+                if (!status) {
+                    alert('Please select rounds status (SAT/UNSAT)');
+                    return;
+                }
+
+                if (status === 'UNSAT' && !notes) {
+                    alert('Notes are required for UNSAT rounds');
+                    return;
+                }
+
+                const inspection = {
+                    locationCode,
+                    status,
+                    reading: reading,
+                    notes: status === 'UNSAT' ? notes : '',
+                    timestamp: new Date().toISOString(),
+                    dateTime: new Date().toLocaleString()
+                };
+
+                this.inspectionLog.push(inspection);
+                this.saveLog();
+                this.updateLogDisplay();
+                this.cancelInspection();
+                this.updateStatus(`✅ Round recorded for ${locationCode}`, 'success');
+            }
+
+            cancelInspection() {
+                this.inspectionForm.classList.remove('active');
+                this.currentQR = null;
+            }
+
+            // Make logs persistent with localStorage
+            loadLog() {
+                try {
+                    const stored = localStorage.getItem('inspectionLog');
+                    return stored ? JSON.parse(stored) : [];
+                } catch (e) {
+                    return [];
+                }
+            }
+
+            saveLog() {
+                localStorage.setItem('inspectionLog', JSON.stringify(this.inspectionLog));
+            }
+
+            // --- UPDATED: Show log shift label and group logs by shift ---
+            updateLogDisplay() {
+                if (this.inspectionLog.length === 0) {
+                    this.logShiftLabel.textContent = '';
+                    this.logContainer.innerHTML = '<p>No rounds recorded yet.</p>';
+                    return;
+                }
+
+                // Group log entries by shift using date and time logic
+                // Each entry: { locationCode, status, reading, notes, timestamp, dateTime }
+                // We'll bucket logs as either Day Shift or Night Shift per log entry
+
+                // Helper to get shift label by timestamp
+                const getShiftLabelFromTimestamp = (isoString) => {
+                    const dateObj = new Date(isoString);
+                    const hours = dateObj.getHours();
+                    return (hours >= 6 && hours < 18) ? 'Day Shift' : 'Night Shift';
+                };
+
+                // Group logs by shift (in reverse chronological order)
+                const sortedLog = [...this.inspectionLog].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                let html = '';
+                let currentShift = null;
+
+                sortedLog.forEach((entry, idx) => {
+                    const entryShift = getShiftLabelFromTimestamp(entry.timestamp);
+
+                    // When shift changes (or first entry), insert shift label subheading
+                    if (entryShift !== currentShift) {
+                        html += `<div class="log-shift-label">${entryShift}</div>`;
+                        currentShift = entryShift;
+                    }
+
+                    const statusClass = entry.status.toLowerCase();
+                    html += `
+                        <div class="log-entry ${statusClass}">
+                            <div class="log-entry-header">
+                                ${entry.locationCode} - ${entry.status}
+                            </div>
+                            <div class="log-entry-details">
+                                <div>Date/Time: ${entry.dateTime}</div>
+                                ${entry.reading ? `<div>Reading: ${entry.reading}</div>` : ''}
+                                ${entry.notes ? `<div>Notes: ${entry.notes}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                // Show current shift label above the log (for context)
+                const now = new Date();
+                const hours = now.getHours();
+                const shiftLabel = (hours >= 6 && hours < 18) ? 'Day Shift' : 'Night Shift';
+                this.logShiftLabel.textContent = `Current Shift: ${shiftLabel}`;
+
+                this.logContainer.innerHTML = html;
+            }
+
+            clearLog() {
+                if (confirm('Are you sure you want to clear all rounds logs? This cannot be undone.')) {
+                    this.inspectionLog = [];
+                    this.saveLog();
+                    this.updateLogDisplay();
+                    this.updateStatus('Inspection log cleared');
+                }
+            }
+
+            // Generate PDF and open email app (mailto)
+            exportLogAsPDFAndEmail() {
+                if (this.inspectionLog.length === 0) {
+                    alert('No rounds to export');
+                    return;
+                }
+
+                // Get shift info
+                const shiftInfo = this.getShiftInfo();
+
+                // Construct log text
+                let logText = `OPERATOR ROUNDS LOG (${shiftInfo.subjectSuffix})\n`;
+                logText += '=========================\n\n';
+
+                this.inspectionLog.forEach((entry) => {
+                    // Show shift label before each log entry
+                    const entryShift = this.getShiftInfo(entry.timestamp).shift;
+                    logText += `[${entryShift}]\n`;
+                    logText += `Location: ${entry.locationCode}\n`;
+                    logText += `Status: ${entry.status}\n`;
+                    logText += `Date/Time: ${entry.dateTime}\n`;
+                    if (entry.reading) {
+                        logText += `Reading: ${entry.reading}\n`;
+                    }
+                    if (entry.notes) {
+                        logText += `Notes: ${entry.notes}\n`;
+                    }
+                    logText += '\n---\n\n';
+                });
+
+                // Generate PDF using jsPDF
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                const lines = doc.splitTextToSize(logText, 180); // fit page width
+                doc.text(lines, 10, 10);
+
+                // Save PDF
+                const pdfFileName = `operator_rounds_log_${shiftInfo.fileSuffix}.pdf`;
+                doc.save(pdfFileName);
+
+                // Open mailto: link (user will have to manually attach the PDF)
+                const subject = encodeURIComponent(`PlantPulse Operator Rounds Log - ${shiftInfo.subjectSuffix}`);
+                const body = encodeURIComponent(
+                    `Please find attached the operator rounds log PDF for ${shiftInfo.subjectSuffix}.\n\n(Attach the downloaded PDF file to this email)`
+                );
+                window.location.href = `mailto:?subject=${subject}&body=${body}`;
+
+                this.updateStatus('PDF generated and email client opened. Please attach the PDF file.', 'success');
+                alert('PDF generated and email client opened. Please attach the PDF file.');
+            }
+
+            downloadLog() {
+                if (this.inspectionLog.length === 0) {
+                    alert('No rounds to download');
+                    return;
+                }
+
+                // Get shift info
+                const shiftInfo = this.getShiftInfo();
+
+                let logText = `OPERATOR ROUNDS LOG (${shiftInfo.subjectSuffix})\n`;
+                logText += '=========================\n\n';
+
+                this.inspectionLog.forEach((entry) => {
+                    // Show shift label before each log entry
+                    const entryShift = this.getShiftInfo(entry.timestamp).shift;
+                    logText += `[${entryShift}]\n`;
+                    logText += `Location: ${entry.locationCode}\n`;
+                    logText += `Status: ${entry.status}\n`;
+                    logText += `Date/Time: ${entry.dateTime}\n`;
+                    if (entry.reading) {
+                        logText += `Reading: ${entry.reading}\n`;
+                    }
+                    if (entry.notes) {
+                        logText += `Notes: ${entry.notes}\n`;
+                    }
+                    logText += '\n---\n\n';
+                });
+
+                const blob = new Blob([logText], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `operator_rounds_log_${shiftInfo.fileSuffix}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                this.updateStatus('Log file downloaded!');
+            }
+
+            updateStatus(message, type = 'info') {
+                this.status.textContent = message;
+                if (type === 'error') {
+                    this.status.style.background = '#e74c3c';
+                } else if (type === 'success') {
+                    this.status.style.background = '#27ae60';
+                } else {
+                    this.status.style.background = '#34495e';
+                }
+            }
+
+            openManualEntryModal() {
+                this.manualLocationInput.value = '';
+                this.manualEntryModal.classList.remove('hidden');
+                this.manualLocationInput.focus();
+                document.body.style.overflow = 'hidden';
+            }
+
+            closeManualEntryModal() {
+                this.manualEntryModal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+
+            handleManualEntrySubmit() {
+                const manualLocation = this.manualLocationInput.value.trim();
+                if (!manualLocation) {
+                    alert('Please enter a location description');
+                    this.manualLocationInput.focus();
+                    return;
+                }
+                this.closeManualEntryModal();
+                this.showInspectionForm(manualLocation);
+                this.qrDisplay.classList.remove('hidden');
+                this.lastQR.textContent = manualLocation;
+                this.currentQR = manualLocation;
+                this.qrDisplay.classList.add('flash');
+                setTimeout(() => {
+                    this.qrDisplay.classList.remove('flash');
+                }, 500);
+                this.updateStatus(`Manual entry: ${manualLocation}`, 'success');
+            }
+        }
+
+        let app;
+        document.addEventListener('DOMContentLoaded', () => {
+            app = new QRInspectionApp();
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && app && app.isScanning) {
+                app.stopScanning();
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (app && app.isScanning) {
+                app.stopScanning();
+            }
+        });
+    </script>
+</body>
+</html>
