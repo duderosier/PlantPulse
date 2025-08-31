@@ -1104,9 +1104,9 @@
                 let email = prompt("Enter recipient email to send PDF (leave blank to skip):");
                 if (email && email.trim()) {
                     // Attach PDF to mailto link
-                    doc.save('temp.pdf'); // Download for user
+                    doc.save(`Operator_Rounds_Log_${titleInfo.fileSuffix}.pdf`); // Download for user
                     setTimeout(() => {
-                        let mailto = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent('Operator Rounds Log ' + titleInfo.subjectSuffix)}&body=${encodeURIComponent('Please find attached the PDF log.')}`;
+                        let mailto = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent('Operator Rounds Log ' + titleInfo.subjectSuffix)}&body=${encodeURIComponent('Please find attached the operator rounds log.')}`;
                         window.location.href = mailto;
                     }, 500);
                 } else {
