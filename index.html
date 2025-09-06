@@ -831,6 +831,13 @@
                 this.placeholder.style.display = 'none';
                 this.video.style.display = 'block';
             
+                // Wait for the video to have dimensions before setting canvas size
+                this.video.onloadedmetadata = () => {
+                    this.canvas.width = this.video.videoWidth;
+                    this.canvas.height = this.video.videoHeight;
+                    console.log(`Canvas resized to ${this.canvas.width}x${this.canvas.height}`);
+                };
+            
                 try {
                     // This is crucial for some mobile browsers
                     await this.video.play();
@@ -843,13 +850,7 @@
                     this.updateStatus('Point camera at QR code', 'success');
                     document.getElementById('scannerMessage').textContent = 'Scanning...';
             
-                    // Wait for the video to have dimensions before setting canvas size
-                    this.video.onloadedmetadata = () => {
-                        this.canvas.width = this.video.videoWidth;
-                        this.canvas.height = this.video.videoHeight;
-                        console.log(`Canvas resized to ${this.canvas.width}x${this.canvas.height}`);
-                        this.scanQRCode();
-                    };
+                    this.scanQRCode(); // Start scanning
                 } catch (playError) {
                     console.error("Video play error:", playError);
                     this.updateStatus(`Could not start video. Error: ${playError.message}`, 'error');
@@ -877,7 +878,9 @@
                 }
 
                 // Continue scanning on the next frame
-                this.animationFrame = requestAnimationFrame(() => this.scanQRCode());
+                if (this.isScanning) {
+                    this.animationFrame = requestAnimationFrame(() => this.scanQRCode());
+                }
             }
             
             scheduleNextScan() {
