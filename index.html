@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: gap:">
     <title>PlantPulse</title>
     <script src="jsQR.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -472,7 +475,7 @@
             <div class="scanner-message" id="scannerMessage">
                 Click "Start Camera" to begin
             </div>
-            <video id="video" autoplay playsinline></video>
+            <video id="video" autoplay playsinline muted></video>
             <canvas id="canvas"></canvas>
             <div class="scanner-placeholder" id="placeholder"></div>
             <div class="scanner-overlay"></div>
@@ -585,6 +588,10 @@
                 this.stream = null;
                 this.scanPrefillDate = null;
                 this.scanPrefillTime = null;
+                // Add this method to your QRInspectionApp class, around line 585 after constructor
+                isIOS() {
+                    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                }
 
                 // Filtering state
                 this.filterDate = '';
@@ -759,90 +766,165 @@
                 };
             }
 
-            async startScanning() {
-                try {
-                    this.updateStatus('Requesting camera permissions...', 'info');
-                    this.stream = await navigator.mediaDevices.getUserMedia({
-                        video: {
-                            facingMode: 'environment',
-                            width: { ideal: 1280 },
-                            height: { ideal: 720 }
-                        }
-                    });
-
-                    this.video.srcObject = this.stream;
-                    this.video.setAttribute('playsinline', true);
-                    this.video.play();
-
-                    this.placeholder.style.display = 'none';
-                    this.video.style.display = 'block';
-
-                    this.isScanning = true;
-                    this.startBtn.disabled = true;
-                    this.stopBtn.disabled = false;
-                    this.manualEntryBtn.disabled = true;
-
-                    this.updateStatus('Camera active - Point at QR code to scan', 'success');
-
-                    this.video.addEventListener('loadedmetadata', () => {
-                        this.canvas.width = this.video.videoWidth;
-                        this.canvas.height = this.video.videoHeight;
-                        this.scanQRCode();
-                    });
-
-                } catch (error) {
-                    console.error('Camera error:', error);
-                    let errorMessage = 'Camera access failed. ';
-
-                    if (error.name === 'NotAllowedError') {
-                        errorMessage += 'Please allow camera permissions and try again.';
-                    } else if (error.name === 'NotFoundError') {
-                        errorMessage += 'No camera found on this device.';
-                    } else if (error.name === 'NotSupportedError') {
-                        errorMessage += 'Camera not supported in this browser.';
-                    } else {
-                        errorMessage += error.message;
+            // Around line 679-700: Replace the startScanning method with this improved version
+        async startScanning() {
+            try {
+                this.updateStatus('Requesting camera permissions...', 'info');
+                
+                // iOS-specific constraints
+                const constraints = {
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
                     }
-
-                    this.updateStatus(errorMessage, 'error');
+                };
+                
+                // For iOS, stop any existing streams first
+                if (this.video.srcObject) {
+                    const tracks = this.video.srcObject.getTracks();
+                    tracks.forEach(track => track.stop());
                 }
-            }
-
-            scanQRCode() {
-                if (!this.isScanning) return;
-
-                if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
+                
+                this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                // Set these attributes programmatically as well
+                this.video.setAttribute('playsinline', true);
+                this.video.setAttribute('autoplay', true);
+                this.video.setAttribute('muted', true);
+                
+                // Assign the stream to video element
+                this.video.srcObject = this.stream;
+                
+                // For iOS, explicitly call play() after a short delay
+                setTimeout(() => {
+                    this.video.play()
+                        .then(() => {
+                            console.log("Video playback started successfully");
+                        })
+                        .catch(e => {
+                            console.error("Video playback failed:", e);
+                            this.updateStatus(`Video playback error: ${e.message}`, 'error');
+                        });
+                }, 100);
+        
+                this.placeholder.style.display = 'none';
+                this.video.style.display = 'block';
+        
+                this.isScanning = true;
+                this.startBtn.disabled = true;
+                this.stopBtn.disabled = false;
+                this.manualEntryBtn.disabled = true;
+        
+                this.updateStatus('Camera active - Point at QR code to scan', 'success');
+        
+                // Use both load events for better iOS compatibility
+                this.video.addEventListener('loadeddata', () => {
                     this.canvas.width = this.video.videoWidth;
                     this.canvas.height = this.video.videoHeight;
-                    this.context.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
-
-                    const imageData = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height);
-                    let code = jsQR(imageData.data, imageData.width, imageData.height, {
-                        inversionAttempts: "attemptBoth"
-                    });
-
-                    if (code && code.data && code.data.trim()) {
-                        this.handleQRDetected(code.data.trim());
-                        return;
-                    }
-
-                    const centerX = Math.floor(this.canvas.width * 0.15);
-                    const centerY = Math.floor(this.canvas.height * 0.15);
-                    const centerWidth = Math.floor(this.canvas.width * 0.7);
-                    const centerHeight = Math.floor(this.canvas.height * 0.7);
-
-                    const centerImageData = this.context.getImageData(centerX, centerY, centerWidth, centerHeight);
-                    code = jsQR(centerImageData.data, centerImageData.width, centerImageData.height, {
-                        inversionAttempts: "attemptBoth"
-                    });
-
-                    if (code && code.data && code.data.trim()) {
-                        this.handleQRDetected(code.data.trim());
-                        return;
-                    }
+                    this.scanQRCode();
+                }, { once: true });
+                
+                this.video.addEventListener('loadedmetadata', () => {
+                    this.canvas.width = this.video.videoWidth;
+                    this.canvas.height = this.video.videoHeight;
+                    this.scanQRCode();
+                }, { once: true });
+        
+            } catch (error) {
+                console.error('Camera error:', error);
+                let errorMessage = 'Camera access failed. ';
+        
+                if (error.name === 'NotAllowedError') {
+                    errorMessage += 'Please allow camera permissions and try again.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage += 'No camera found on this device.';
+                } else if (error.name === 'NotSupportedError') {
+                    errorMessage += 'Camera not supported in this browser.';
+                } else if (error.name === 'AbortError' && /iOS|iPhone|iPad|iPod/.test(navigator.userAgent)) {
+                    errorMessage += 'iOS camera error. Try refreshing the page or check camera permissions in settings.';
+                } else {
+                    errorMessage += error.message;
                 }
-
-                this.animationFrame = requestAnimationFrame(() => this.scanQRCode());
+        
+                this.updateStatus(errorMessage, 'error');
+            }
+        }
+            
+            // Around line 727: Replace the scanQRCode method with this improved version
+            scanQRCode() {
+                if (!this.isScanning) return;
+            
+                try {
+                    if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
+                        // Make sure dimensions are correct
+                        const width = this.video.videoWidth;
+                        const height = this.video.videoHeight;
+                        
+                        if (width && height) {
+                            this.canvas.width = width;
+                            this.canvas.height = height;
+                            
+                            // Clear canvas before drawing
+                            this.context.clearRect(0, 0, width, height);
+                            this.context.drawImage(this.video, 0, 0, width, height);
+            
+                            // Get image data with error handling
+                            let imageData;
+                            try {
+                                imageData = this.context.getImageData(0, 0, width, height);
+                            } catch (e) {
+                                console.error("Error getting image data:", e);
+                                // Continue scanning despite error
+                                this.animationFrame = requestAnimationFrame(() => this.scanQRCode());
+                                return;
+                            }
+            
+                            // Try to detect QR code
+                            try {
+                                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                                    inversionAttempts: "dontInvert" // Try "dontInvert" first for performance
+                                });
+            
+                                if (code && code.data && code.data.trim()) {
+                                    this.handleQRDetected(code.data.trim());
+                                    return;
+                                }
+                                
+                                // If no code found, try with different settings
+                                const centerX = Math.floor(width * 0.2);
+                                const centerY = Math.floor(height * 0.2);
+                                const centerWidth = Math.floor(width * 0.6);
+                                const centerHeight = Math.floor(height * 0.6);
+            
+                                if (centerWidth > 0 && centerHeight > 0) {
+                                    try {
+                                        const centerImageData = this.context.getImageData(centerX, centerY, centerWidth, centerHeight);
+                                        const centerCode = jsQR(centerImageData.data, centerImageData.width, centerImageData.height, {
+                                            inversionAttempts: "attemptBoth" // Try both for better detection
+                                        });
+            
+                                        if (centerCode && centerCode.data && centerCode.data.trim()) {
+                                            this.handleQRDetected(centerCode.data.trim());
+                                            return;
+                                        }
+                                    } catch (e) {
+                                        console.error("Error in center image processing:", e);
+                                    }
+                                }
+                            } catch (e) {
+                                console.error("QR processing error:", e);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error("Scan error:", error);
+                }
+            
+                // Throttle scanning for iOS performance (every 150ms instead of every frame)
+                setTimeout(() => {
+                    this.animationFrame = requestAnimationFrame(() => this.scanQRCode());
+                }, 150);
             }
 
             handleQRDetected(qrData) {
@@ -866,19 +948,43 @@
                 this.stopScanning();
             }
 
+            // Around line 777: Replace the stopScanning method
             stopScanning() {
                 this.isScanning = false;
+                
                 if (this.animationFrame) {
                     cancelAnimationFrame(this.animationFrame);
                     this.animationFrame = null;
                 }
+                
+                // Improved stream cleanup
                 if (this.stream) {
-                    this.stream.getTracks().forEach(track => track.stop());
+                    try {
+                        const tracks = this.stream.getTracks();
+                        tracks.forEach(track => {
+                            try {
+                                track.stop();
+                            } catch (e) {
+                                console.error("Error stopping track:", e);
+                            }
+                        });
+                    } catch (e) {
+                        console.error("Error accessing stream tracks:", e);
+                    }
                     this.stream = null;
                 }
-                this.video.srcObject = null;
-                this.video.style.display = 'none';
-                this.placeholder.style.display = 'flex';
+                
+                // Clear video source
+                try {
+                    if (this.video.srcObject) {
+                        this.video.srcObject = null;
+                    }
+                    this.video.style.display = 'none';
+                    this.placeholder.style.display = 'flex';
+                } catch (e) {
+                    console.error("Error cleaning up video:", e);
+                }
+                
                 this.startBtn.disabled = false;
                 this.stopBtn.disabled = true;
                 this.manualEntryBtn.disabled = false;
