@@ -859,76 +859,27 @@
             
             scanQRCode() {
                 if (!this.isScanning) return;
-            
-                try {
-                    if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
-                        // Make sure dimensions are correct
-                        const width = this.video.videoWidth;
-                        const height = this.video.videoHeight;
-                        
-                        if (width && height) {
-                            this.canvas.width = width;
-                            this.canvas.height = height;
-                            
-                            // Clear canvas before drawing
-                            this.context.clearRect(0, 0, width, height);
-                            this.context.drawImage(this.video, 0, 0, width, height);
-            
-                            // Get image data with error handling
-                            let imageData;
-                            try {
-                                imageData = this.context.getImageData(0, 0, width, height);
-                            } catch (e) {
-                                console.error("Error getting image data:", e);
-                                // Continue scanning despite error
-                                this.scheduleNextScan();
-                                return;
-                            }
-            
-                            // Try to detect QR code
-                            try {
-                                const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                                    inversionAttempts: "dontInvert" // Try "dontInvert" first for performance
-                                });
-            
-                                if (code && code.data && code.data.trim()) {
-                                    this.handleQRDetected(code.data.trim());
-                                    return;
-                                }
-                                
-                                // If no code found with default settings, try with center focus
-                                const centerX = Math.floor(width * 0.2);
-                                const centerY = Math.floor(height * 0.2);
-                                const centerWidth = Math.floor(width * 0.6);
-                                const centerHeight = Math.floor(height * 0.6);
-            
-                                if (centerWidth > 0 && centerHeight > 0) {
-                                    try {
-                                        const centerImageData = this.context.getImageData(centerX, centerY, centerWidth, centerHeight);
-                                        const centerCode = jsQR(centerImageData.data, centerImageData.width, centerImageData.height, {
-                                            inversionAttempts: "attemptBoth" // Try both for better detection
-                                        });
-            
-                                        if (centerCode && centerCode.data && centerCode.data.trim()) {
-                                            this.handleQRDetected(centerCode.data.trim());
-                                            return;
-                                        }
-                                    } catch (e) {
-                                        console.error("Error in center image processing:", e);
-                                    }
-                                }
-                            } catch (e) {
-                                console.error("QR processing error:", e);
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error("Scan error:", error);
-                }
-            
-                this.scheduleNextScan();
-            }
 
+                if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
+                    this.canvas.width = this.video.videoWidth;
+                    this.canvas.height = this.video.videoHeight;
+                    this.context.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+
+                    const imageData = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height);
+                    let code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "dontInvert" // Use "dontInvert" for better performance on mobile
+                    });
+
+                    if (code && code.data && code.data.trim()) {
+                        this.handleQRDetected(code.data.trim());
+                        return; // Stop scanning once a code is found
+                    }
+                }
+
+                // Continue scanning on the next frame
+                this.animationFrame = requestAnimationFrame(() => this.scanQRCode());
+            }
+            
             scheduleNextScan() {
                 // Adaptive scanning rate based on device
                 const scanInterval = this.isAndroid() ? 100 : 150; // Faster for Android, slower for iOS
