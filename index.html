@@ -776,107 +776,110 @@
                 };
             }
 
-            // Replace the entire startScanning method with this version
-            async startScanning() {
-                // Reset state
-                this.isScanning = false;
-                this.updateStatus('Initializing camera...', 'info');
-                
-                // First, ensure any previous instances are cleaned up
-                if (this.stream) {
-                    this.stream.getTracks().forEach(track => track.stop());
-                    this.stream = null;
-                }
-                
+           async startScanning() {
                 try {
-                    // Start with basic constraints
-                    const constraints = {
-                        video: true  // Simplest possible constraint
-                    };
+                    this.updateStatus('Requesting rear camera...', 'info');
                     
-                    console.log("Requesting camera with constraints:", constraints);
-                    
-                    // Request camera access
-                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
-                    console.log("Camera stream obtained:", this.stream);
-                    
-                    // Set video properties directly
-                    this.video.srcObject = this.stream;
-                    this.video.style.display = 'block';
-                    this.placeholder.style.display = 'none';
-                    
-                    // Important: Make sure video element is visible and has dimensions
-                    this.video.style.width = '100%';
-                    this.video.style.height = '100%';
-                    
-                    // Direct play with error handling
-                    try {
-                        console.log("Attempting to play video");
-                        await this.video.play();
-                        console.log("Video playing successfully");
-                        
-                        // Update UI state only after successful play
-                        this.isScanning = true;
-                        this.startBtn.disabled = true;
-                        this.stopBtn.disabled = false;
-                        this.manualEntryBtn.disabled = true;
-                        
-                        // Set canvas dimensions
-                        this.canvas.width = this.video.videoWidth || 640;
-                        this.canvas.height = this.video.videoHeight || 480;
-                        
-                        this.updateStatus('Camera active - Point at QR code to scan', 'success');
-                        this.scanQRCode();
-                    } catch (playError) {
-                        console.error("Error playing video:", playError);
-                        this.updateStatus(`Could not start video: ${playError.message}`, 'error');
-                        this.stopScanning();
+                    // Clean up any existing streams
+                    if (this.video.srcObject) {
+                        const tracks = this.video.srcObject.getTracks();
+                        tracks.forEach(track => track.stop());
                     }
+                    
+                    let stream = null;
+                    
+                    // First try the strict rear camera requirement
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia({
+                            video: {
+                                facingMode: { exact: "environment" },
+                                width: { ideal: 1280 },
+                                height: { ideal: 720 }
+                            }
+                        });
+                        console.log("Strict rear camera access granted");
+                    } catch (err) {
+                        console.log("Strict rear camera failed, trying fallback:", err);
+                        
+                        // If that fails, try a more lenient approach
+                        try {
+                            stream = await navigator.mediaDevices.getUserMedia({
+                                video: { 
+                                    facingMode: "environment"
+                                }
+                            });
+                            console.log("Fallback rear camera access granted");
+                        } catch (fallbackErr) {
+                            console.log("Fallback rear camera failed, trying any camera:", fallbackErr);
+                            
+                            // Last resort - try any camera
+                            stream = await navigator.mediaDevices.getUserMedia({
+                                video: true
+                            });
+                            console.log("Any camera access granted");
+                        }
+                    }
+                    
+                    // If we got a stream, set it up
+                    this.stream = stream;
+                    
+                    // Explicitly set video element attributes
+                    this.video.setAttribute('autoplay', 'true');
+                    this.video.setAttribute('playsinline', 'true');
+                    this.video.setAttribute('muted', 'true');
+                    this.video.srcObject = this.stream;
+                    
+                    // Make sure video is visible
+                    this.placeholder.style.display = 'none';
+                    this.video.style.display = 'block';
+                    
+                    // Force a play attempt after a short delay
+                    setTimeout(async () => {
+                        try {
+                            await this.video.play();
+                            console.log("Video playing successfully");
+                            
+                            // Update UI state
+                            this.isScanning = true;
+                            this.startBtn.disabled = true;
+                            this.stopBtn.disabled = false;
+                            this.manualEntryBtn.disabled = true;
+                            
+                            this.updateStatus('Rear camera active - Point at QR code', 'success');
+                            
+                            // Set up canvas
+                            this.canvas.width = this.video.videoWidth || 640;
+                            this.canvas.height = this.video.videoHeight || 480;
+                            
+                            // Start scanning
+                            this.scanQRCode();
+                        } catch (playError) {
+                            console.error("Video play error:", playError);
+                            this.updateStatus(`Video playback error: ${playError.message}. Try reloading the page.`, 'error');
+                        }
+                    }, 300);
+                    
                 } catch (error) {
-                    console.error("Camera access error:", error);
-                    this.handleCameraError(error);
+                    console.error('Camera access error:', error);
+                    let errorMessage = 'Camera access failed: ';
+                    
+                    if (error.name === 'NotAllowedError') {
+                        errorMessage += 'You denied camera permission. Please allow camera access and try again.';
+                    } else if (error.name === 'NotFoundError') {
+                        errorMessage += 'No camera found on this device.';
+                    } else if (error.name === 'NotSupportedError') {
+                        errorMessage += 'Your browser does not support camera access.';
+                    } else if (error.name === 'NotReadableError' || error.name === 'AbortError') {
+                        errorMessage += 'Camera is in use by another application. Close other camera apps and try again.';
+                    } else if (error.name === 'OverconstrainedError') {
+                        errorMessage += 'Could not find a camera matching requirements. Try a different device.';
+                    } else {
+                        errorMessage += error.message || 'Unknown error occurred.';
+                    }
+                    
+                    this.updateStatus(errorMessage, 'error');
+                    this.startBtn.disabled = false;
                 }
-            }
-            
-            // Add this helper method
-            handleCameraError(error) {
-                console.error("Camera error details:", error);
-                
-                let message = "Camera error: ";
-                
-                // Handle specific error types
-                switch(error.name) {
-                    case 'NotAllowedError':
-                        message += "Camera permission denied. Please allow camera access in your browser settings.";
-                        break;
-                    case 'NotFoundError':
-                        message += "No camera detected on this device.";
-                        break;
-                    case 'NotReadableError':
-                        message += "Camera is already in use by another application.";
-                        break;
-                    case 'OverconstrainedError':
-                        message += "Camera doesn't meet requirements. Try a different device.";
-                        break;
-                    case 'AbortError':
-                        message += "Camera access was aborted.";
-                        break;
-                    case 'SecurityError':
-                        message += "Camera access blocked due to security restrictions.";
-                        break;
-                    case 'TypeError':
-                        message += "Invalid constraints or parameters.";
-                        break;
-                    default:
-                        message += error.message || "Unknown error occurred.";
-                }
-                
-                this.updateStatus(message, 'error');
-                
-                // Reset UI state
-                this.startBtn.disabled = false;
-                this.stopBtn.disabled = true;
-                this.isScanning = false;
             }
             
             scanQRCode() {
