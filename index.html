@@ -770,92 +770,73 @@
                 };
             }
 
+            // Replace the startScanning method with this improved version
             async startScanning() {
                 try {
                     this.updateStatus('Requesting camera permissions...', 'info');
                     
-                    // Cross-platform constraints
+                    // Simpler constraints first - can expand later if successful
                     const constraints = {
-                        video: {
-                            facingMode: 'environment',
-                            width: { ideal: 1280 },
-                            height: { ideal: 720 },
-                            frameRate: { ideal: 15 }
-                        }
+                        video: { facingMode: 'environment' }
                     };
                     
-                    // For any existing streams, stop them first
+                    // Clean up any existing streams
                     if (this.video.srcObject) {
                         const tracks = this.video.srcObject.getTracks();
                         tracks.forEach(track => track.stop());
                     }
                     
+                    // Request camera access
                     this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    console.log("Camera access granted", this.stream);
                     
-                    // Ensure video attributes are set
-                    this.video.setAttribute('playsinline', true);
-                    this.video.setAttribute('autoplay', true);
-                    this.video.setAttribute('muted', true);
-                    
-                    // Assign the stream to video element
+                    // Set video source
                     this.video.srcObject = this.stream;
                     
-                    // For both Android and iOS, explicitly call play() after a short delay
-                    setTimeout(() => {
-                        this.video.play()
-                            .then(() => {
-                                console.log("Video playback started successfully");
-                            })
-                            .catch(e => {
-                                console.error("Video playback failed:", e);
-                                this.updateStatus(`Video playback error: ${e.message}`, 'error');
-                            });
-                    }, 200);
-            
+                    // Make sure video is visible
                     this.placeholder.style.display = 'none';
                     this.video.style.display = 'block';
-            
+                    
+                    // Update UI state
                     this.isScanning = true;
                     this.startBtn.disabled = true;
                     this.stopBtn.disabled = false;
                     this.manualEntryBtn.disabled = true;
-            
-                    this.updateStatus('Camera active - Point at QR code to scan', 'success');
-            
-                    // Use both load events for better cross-platform compatibility
-                    const handleVideoReady = () => {
-                        if (this.video.videoWidth > 0 && this.video.videoHeight > 0) {
-                            this.canvas.width = this.video.videoWidth;
-                            this.canvas.height = this.video.videoHeight;
-                            this.scanQRCode();
-                        }
-                    };
                     
-                    this.video.addEventListener('loadeddata', handleVideoReady, { once: true });
-                    this.video.addEventListener('loadedmetadata', handleVideoReady, { once: true });
-                    
-                    // Fallback for Android if the events don't trigger
-                    if (this.isAndroid()) {
-                        setTimeout(handleVideoReady, 1000);
+                    // Play video with better error handling
+                    try {
+                        await this.video.play();
+                        console.log("Video playback started successfully");
+                        this.updateStatus('Camera active - Point at QR code to scan', 'success');
+                        
+                        // Set up canvas dimensions
+                        this.canvas.width = this.video.videoWidth || 640;
+                        this.canvas.height = this.video.videoHeight || 480;
+                        
+                        // Start scanning
+                        this.scanQRCode();
+                    } catch (playError) {
+                        console.error("Video play error:", playError);
+                        this.updateStatus(`Video playback error: ${playError.message}. Try reloading the page.`, 'error');
                     }
-            
                 } catch (error) {
-                    console.error('Camera error:', error);
-                    let errorMessage = 'Camera access failed. ';
-            
+                    console.error('Camera access error:', error);
+                    let errorMessage = 'Camera access failed: ';
+                    
                     if (error.name === 'NotAllowedError') {
-                        errorMessage += 'Please allow camera permissions and try again.';
+                        errorMessage += 'You denied camera permission. Please allow camera access and try again.';
                     } else if (error.name === 'NotFoundError') {
                         errorMessage += 'No camera found on this device.';
                     } else if (error.name === 'NotSupportedError') {
-                        errorMessage += 'Camera not supported in this browser.';
+                        errorMessage += 'Your browser does not support camera access.';
                     } else if (error.name === 'NotReadableError' || error.name === 'AbortError') {
-                        errorMessage += 'Camera is already in use or not available. Try closing other apps using the camera.';
+                        errorMessage += 'Camera is in use by another application. Close other camera apps and try again.';
                     } else {
-                        errorMessage += error.message;
+                        errorMessage += error.message || 'Unknown error occurred.';
                     }
-            
+                    
                     this.updateStatus(errorMessage, 'error');
+                    this.startBtn.disabled = false;
                 }
             }
             
