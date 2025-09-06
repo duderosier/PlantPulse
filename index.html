@@ -588,15 +588,6 @@
                 this.stream = null;
                 this.scanPrefillDate = null;
                 this.scanPrefillTime = null;
-                // Method to detect device type
-                isAndroid() {
-                    return /Android/i.test(navigator.userAgent);
-                }
-                
-                isIOS() {
-                    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-                }
-
                 // Filtering state
                 this.filterDate = '';
                 this.filterShift = '';
@@ -607,6 +598,15 @@
                 this.updateRecentReading();
             }
 
+            // Method to detect device type
+            isAndroid() {
+                return /Android/i.test(navigator.userAgent);
+            }
+            
+            isIOS() {
+                return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            }
+            
             initializeElements() {
                 this.startBtn = document.getElementById('startBtn');
                 this.stopBtn = document.getElementById('stopBtn');
@@ -770,109 +770,90 @@
                 };
             }
 
-           async startScanning() {
-                try {
-                    this.updateStatus('Requesting rear camera...', 'info');
-                    
-                    // Clean up any existing streams
-                    if (this.video.srcObject) {
-                        const tracks = this.video.srcObject.getTracks();
-                        tracks.forEach(track => track.stop());
-                    }
-                    
-                    let stream = null;
-                    
-                    // First try the strict rear camera requirement
+            async startScanning() {
+                this.updateStatus('Starting camera...', 'info');
+                document.getElementById('scannerMessage').textContent = 'Starting camera...';
+
+                // Clean up any existing streams
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.stream = null;
+                }
+            
+                const constraintsToTry = [
+                    // Preferred: High-res rear camera
+                    { video: { facingMode: { exact: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+                    // Standard rear camera
+                    { video: { facingMode: "environment" } },
+                    // Any camera, if rear is not available
+                    { video: true }
+                ];
+            
+                let stream = null;
+                let lastError = null;
+            
+                for (const constraints of constraintsToTry) {
                     try {
-                        stream = await navigator.mediaDevices.getUserMedia({
-                            video: {
-                                facingMode: { exact: "environment" },
-                                width: { ideal: 1280 },
-                                height: { ideal: 720 }
-                            }
-                        });
-                        console.log("Strict rear camera access granted");
+                        stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        console.log("Camera access granted with constraints:", JSON.stringify(constraints));
+                        break; // Success, exit loop
                     } catch (err) {
-                        console.log("Strict rear camera failed, trying fallback:", err);
-                        
-                        // If that fails, try a more lenient approach
-                        try {
-                            stream = await navigator.mediaDevices.getUserMedia({
-                                video: { 
-                                    facingMode: "environment"
-                                }
-                            });
-                            console.log("Fallback rear camera access granted");
-                        } catch (fallbackErr) {
-                            console.log("Fallback rear camera failed, trying any camera:", fallbackErr);
-                            
-                            // Last resort - try any camera
-                            stream = await navigator.mediaDevices.getUserMedia({
-                                video: true
-                            });
-                            console.log("Any camera access granted");
-                        }
+                        lastError = err;
+                        console.warn(`Failed to get camera with constraints: ${JSON.stringify(constraints)}`, err);
                     }
-                    
-                    // If we got a stream, set it up
-                    this.stream = stream;
-                    
-                    // Explicitly set video element attributes
-                    this.video.setAttribute('autoplay', 'true');
-                    this.video.setAttribute('playsinline', 'true');
-                    this.video.setAttribute('muted', 'true');
-                    this.video.srcObject = this.stream;
-                    
-                    // Make sure video is visible
-                    this.placeholder.style.display = 'none';
-                    this.video.style.display = 'block';
-                    
-                    // Force a play attempt after a short delay
-                    setTimeout(async () => {
-                        try {
-                            await this.video.play();
-                            console.log("Video playing successfully");
-                            
-                            // Update UI state
-                            this.isScanning = true;
-                            this.startBtn.disabled = true;
-                            this.stopBtn.disabled = false;
-                            this.manualEntryBtn.disabled = true;
-                            
-                            this.updateStatus('Rear camera active - Point at QR code', 'success');
-                            
-                            // Set up canvas
-                            this.canvas.width = this.video.videoWidth || 640;
-                            this.canvas.height = this.video.videoHeight || 480;
-                            
-                            // Start scanning
-                            this.scanQRCode();
-                        } catch (playError) {
-                            console.error("Video play error:", playError);
-                            this.updateStatus(`Video playback error: ${playError.message}. Try reloading the page.`, 'error');
-                        }
-                    }, 300);
-                    
-                } catch (error) {
-                    console.error('Camera access error:', error);
+                }
+            
+                if (!stream) {
+                    console.error('All attempts to access camera failed.', lastError);
                     let errorMessage = 'Camera access failed: ';
-                    
-                    if (error.name === 'NotAllowedError') {
-                        errorMessage += 'You denied camera permission. Please allow camera access and try again.';
-                    } else if (error.name === 'NotFoundError') {
-                        errorMessage += 'No camera found on this device.';
-                    } else if (error.name === 'NotSupportedError') {
-                        errorMessage += 'Your browser does not support camera access.';
-                    } else if (error.name === 'NotReadableError' || error.name === 'AbortError') {
-                        errorMessage += 'Camera is in use by another application. Close other camera apps and try again.';
-                    } else if (error.name === 'OverconstrainedError') {
-                        errorMessage += 'Could not find a camera matching requirements. Try a different device.';
-                    } else {
-                        errorMessage += error.message || 'Unknown error occurred.';
+                    if (lastError) {
+                        if (lastError.name === 'NotAllowedError') {
+                            errorMessage += 'Permission denied. Please allow camera access in your browser settings.';
+                        } else if (lastError.name === 'NotFoundError' || lastError.name === 'OverconstrainedError') {
+                            errorMessage += 'No suitable camera found on this device.';
+                        } else {
+                            errorMessage += `An unknown error occurred (${lastError.name}).`;
+                        }
                     }
-                    
                     this.updateStatus(errorMessage, 'error');
-                    this.startBtn.disabled = false;
+                    document.getElementById('scannerMessage').textContent = 'Camera access failed';
+                    return;
+                }
+            
+                this.stream = stream;
+                this.video.srcObject = stream;
+                
+                // Ensure video attributes are set for mobile playback
+                this.video.setAttribute('playsinline', 'true');
+                this.video.setAttribute('muted', 'true');
+                this.video.setAttribute('autoplay', 'true');
+            
+                this.placeholder.style.display = 'none';
+                this.video.style.display = 'block';
+            
+                try {
+                    // This is crucial for some mobile browsers
+                    await this.video.play();
+                    console.log("Video playback started.");
+            
+                    this.isScanning = true;
+                    this.startBtn.disabled = true;
+                    this.stopBtn.disabled = false;
+                    this.manualEntryBtn.disabled = true;
+                    this.updateStatus('Point camera at QR code', 'success');
+                    document.getElementById('scannerMessage').textContent = 'Scanning...';
+            
+                    // Wait for the video to have dimensions before setting canvas size
+                    this.video.onloadedmetadata = () => {
+                        this.canvas.width = this.video.videoWidth;
+                        this.canvas.height = this.video.videoHeight;
+                        console.log(`Canvas resized to ${this.canvas.width}x${this.canvas.height}`);
+                        this.scanQRCode();
+                    };
+                } catch (playError) {
+                    console.error("Video play error:", playError);
+                    this.updateStatus(`Could not start video. Error: ${playError.message}`, 'error');
+                    this.stopScanning(); // Clean up
                 }
             }
             
@@ -978,7 +959,7 @@
                 this.stopScanning();
             }
 
-           stopScanning() {
+            stopScanning() {
                 this.isScanning = false;
                 
                 if (this.animationFrame) {
@@ -998,27 +979,21 @@
                             }
                         });
                     } catch (e) {
-                        console.error("Error accessing stream tracks:", e);
+                        console.error("Error getting tracks from stream:", e);
                     }
                     this.stream = null;
                 }
                 
-                // Clear video source
-                try {
-                    if (this.video.srcObject) {
-                        this.video.srcObject = null;
-                    }
-                    this.video.src = ''; // Add this for older browsers
-                    this.video.style.display = 'none';
-                    this.placeholder.style.display = 'flex';
-                } catch (e) {
-                    console.error("Error cleaning up video:", e);
-                }
+                this.video.srcObject = null;
+                this.video.style.display = 'none';
+                this.placeholder.style.display = 'flex';
                 
                 this.startBtn.disabled = false;
                 this.stopBtn.disabled = true;
                 this.manualEntryBtn.disabled = false;
+                
                 this.updateStatus('Camera stopped');
+                document.getElementById('scannerMessage').textContent = 'Click "Start Camera" to begin';
             }
 
             showInspectionForm(qrData, prefillDate, prefillTime) {
