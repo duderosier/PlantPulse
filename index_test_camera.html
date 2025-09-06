@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Camera Test</title>
+    <title>Rear Camera Test</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: Arial; text-align: center; }
@@ -11,13 +11,13 @@
     </style>
 </head>
 <body>
-    <h1>Camera Test</h1>
+    <h1>Rear Camera Test</h1>
     <video id="video" autoplay playsinline></video>
     <div>
-        <button id="startBtn">Start Camera</button>
+        <button id="startBtn">Start Rear Camera</button>
         <button id="stopBtn">Stop Camera</button>
     </div>
-    <div id="status">Click "Start Camera" to test</div>
+    <div id="status">Click "Start Rear Camera" to test</div>
 
     <script>
         const video = document.getElementById('video');
@@ -27,14 +27,33 @@
         let stream = null;
 
         startBtn.addEventListener('click', async () => {
-            status.textContent = 'Requesting camera...';
+            status.textContent = 'Requesting rear camera...';
             try {
-                stream = await navigator.mediaDevices.getUserMedia({video: true});
+                // Specifically request the rear camera
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { exact: "environment" }
+                    }
+                });
                 video.srcObject = stream;
-                status.textContent = 'Camera working!';
+                status.textContent = 'Rear camera working!';
             } catch (err) {
                 status.textContent = `Error: ${err.message}`;
                 console.error('Camera error:', err);
+                
+                // If "exact" fails, try without "exact" as fallback
+                if (err.name === 'OverconstrainedError') {
+                    status.textContent = 'Trying fallback method...';
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia({
+                            video: { facingMode: "environment" }
+                        });
+                        video.srcObject = stream;
+                        status.textContent = 'Rear camera working (fallback mode)!';
+                    } catch (fallbackErr) {
+                        status.textContent = `Fallback error: ${fallbackErr.message}`;
+                    }
+                }
             }
         });
 
